@@ -1,0 +1,92 @@
+import logging
+import os
+import time
+from datetime import datetime, timedelta
+import dateutil.parser as dup
+import pyodbc
+from shared.adf import run_pipeline, monitor_pipeline_run
+from shared.azure import get_configuration_vault_secret, get_azure_sql_connection
+
+def sourcetoraw () :
+  """
+  This pipeline is a HACK/shortcut to pull in S2 data for in-office reporting on a deadline
+
+  S2 People is a typical truncate/reload
+
+  S2 LogActivity is a heap table that is incrementally appended; this is the first implemenation
+  of an incremental table and was not considered in depth
+  """
+  source_database = 'S2_Data'
+  source_schema = 'dbo'
+  target_schema = 'RAW_STAGING'
+
+  def _get_database_connection() -> pyodbc.Connection :
+    dbname = get_configuration_vault_secret( 'PipelinesAllFdeDatabaseName' )
+    return get_azure_sql_connection( dbname, 'FDE' )
+
+  def _get_threshold ( schema_name, table_name, column_name ) -> datetime :
+    query = f'''
+      IF EXISTS (
+          SELECT 1 FROM [INFORMATION_SCHEMA].[TABLES] 
+          WHERE [TABLE_SCHEMA] = '{schema_name}'
+          AND [TABLE_NAME] = '{table_name}'
+      )
+      BEGIN
+        SELECT MAX( {column_name} ) AS max_date FROM {schema_name}.{table_name}
+      END
+      ELSE
+      BEGIN
+        SELECT CAST( '1800-01-01T00:00:00Z' AS DATETIME ) AS max_date
+      END
+    '''
+    for row in _get_database_connection().cursor().execute( query ) :
+      try : 
+        print( f'Row is {row}' )
+        if row.max_date is not None :
+          return row.max_date
+      except AttributeError : pass
+    return ( dup.parse( '1800-01-01T00:00:00Z' ) )
+
+  def IncrementalLoad () -> str :
+    table_name = 'S2_LogActivity'
+    target_table_name = f'{source_database}_{source_schema}_{table_name}'
+    timestamp_column_name = 'dttm'
+    timestamp_load_threshold = _get_threshold( target_schema, target_table_name, timestamp_column_name )
+
+    time_param = timestamp_load_threshold.strftime("%Y-%m-%dT%H:%M:%SZ")
+    logging.info( f'Load S2 turnstile data since {time_param}' )
+
+    pipeline = 'SourceTableIncrementalCopyPipeline'
+    parameters = {
+      'SourceServerName': get_configuration_vault_secret( 'PipelinesS2SourceServerName' ),
+      'SourceDatabaseName' : source_database,
+      'SourceSchemaName' : source_schema,
+      'SourceTableName' : table_name,
+      'TargetSchemaName': target_schema,
+      'TimestampColumnName': timestamp_column_name,
+      'TimestampLoadThreshold': time_param
+    }
+    return run_pipeline( pipeline=pipeline, parameters=parameters )
+
+  def FullLoad () -> str :
+    # TODO: parameterize
+    pipeline = 'SourceTableCopyPipeline'
+    parameters = {
+      'SourceServerName': get_configuration_vault_secret( 'PipelinesS2SourceServerName' ),
+      'SourceDatabaseName' : source_database,
+      'SourceSchemaName' : source_schema,
+      'SourceTableName' : 'S2_Person',
+      'TargetSchemaName' : target_schema
+    }
+    return run_pipeline( pipeline=pipeline, parameters=parameters )
+
+  runs = []
+  runs.append( IncrementalLoad() )
+  runs.append( FullLoad() )
+
+  # TODO: refactor this synchronous monitoring for asynchronous operations
+  for run in runs : 
+    monitor_pipeline_run( run_id=run )
+
+logging.getLogger().setLevel( logging.INFO )
+sourcetoraw()
