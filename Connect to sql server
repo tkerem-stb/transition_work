@@ -1,0 +1,29 @@
+import pyodbc
+
+# Define your connection strings
+source_conn_str = 'DRIVER={SQL Server};SERVER=your_source_server;DATABASE=your_source_db;UID=your_username;PWD=your_password'
+dest_conn_str = 'DRIVER={SQL Server};SERVER=your_dest_server;DATABASE=your_dest_db;UID=your_username;PWD=your_password'
+
+# Connect to the source database
+source_conn = pyodbc.connect(source_conn_str)
+source_cursor = source_conn.cursor()
+
+# Connect to the destination database
+dest_conn = pyodbc.connect(dest_conn_str)
+dest_cursor = dest_conn.cursor()
+
+# Read from source
+source_cursor.execute('SELECT * FROM your_source_table')
+rows = source_cursor.fetchall()
+
+# Write to destination
+for row in rows:
+    dest_cursor.execute('INSERT INTO your_dest_table VALUES (?)', row)
+
+dest_conn.commit()
+
+# Close the connections
+source_cursor.close()
+dest_conn.close()
+source_conn.close()
+dest_conn.close()
