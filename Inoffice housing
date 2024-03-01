@@ -1,0 +1,33 @@
+Based on the process outlined in the image, here are some example acceptance criteria for each task within an Azure DevOps user story:
+
+1. **Rapid 7 API & Turnstile Data Log Process on Cloud**
+   - Data from Rapid 7 API is retrieved successfully without errors.
+   - Turnstile Data Logs are processed and uploaded to the cloud environment.
+   - Data integrity is maintained during the process.
+
+2. **Run DBT Models & Snapshots on Cloud**
+   - DBT models run according to schedule without failures.
+   - Snapshots are captured and stored correctly.
+   - Logs of DBT runs are available for audit and troubleshooting.
+
+3. **Create Combined Table**
+   - Data from Rapid 7 and Turnstile logs is merged into a single table.
+   - The combined table contains all necessary fields and adheres to the defined schema.
+   - Data types and formats are consistent across the combined table.
+
+4. **Export Combined Data**
+   - Combined data is exported to the specified format (e.g., CSV, JSON) without data loss.
+   - Exported data is correctly encoded and can be imported into other systems.
+   - Export process is logged, and the logs are accessible for review.
+
+5. **Merge with GDPR Data On-Premises**
+   - GDPR-compliant data is correctly identified and merged with the combined table data.
+   - Non-compliant data is excluded or anonymized as per GDPR regulations.
+   - The merged dataset upholds GDPR standards throughout the process.
+
+6. **Power BI Reporting**
+   - Reports in Power BI accurately reflect the merged data set.
+   - Power BI reports are accessible to authorized users.
+   - Data refresh in Power BI reports works as scheduled without errors.
+
+These acceptance criteria should be refined and expanded based on the specific requirements of your project, including any data privacy and security considerations, as well as the technical details of each process step.
